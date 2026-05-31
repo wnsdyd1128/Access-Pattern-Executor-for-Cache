@@ -1,1 +1,4 @@
-cache-sim-design.md
+system-prompt-extraction/
+build/
+results/
+compile_commands.json
