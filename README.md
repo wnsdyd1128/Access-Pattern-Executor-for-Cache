@@ -117,15 +117,18 @@ cmake --build build
 
 ---
 
-## 사용법 (구현 예정)
+## 사용법
 
 ```bash
-# 단일 실행
+# 단일 실행 (구현 완료)
 apex-cache run input.ap.json --cache cache.yaml [--shapes shapes.yaml] [--output results/]
 
-# sweep: L1 용량 범위 탐색
+# sweep: L1 용량 범위 탐색 (예정)
 apex-cache sweep input.ap.json --cache cache.yaml --l1-sizes 4K,8K,16K,32K
 ```
+
+`run`은 `--output`(기본 `results/`)에 `summary.csv`, `summary.json`,
+`diagnostics.md`, `object_breakdown.csv`를 생성한다.
 
 ### 설정 파일
 
@@ -218,9 +221,19 @@ Rank  Loop    Access       Miss%  Share  Miss Type   Hint
 | 3 | Memory Layer (MemoryLayout, AddressMapper) | ✅ 완료 |
 | 4 | Cache Layer (YamlConfigParser, LRU 시뮬레이션) | ✅ 완료 |
 | 5 | Analysis Layer (Attribution, MissClassifier, Diagnostics) | ✅ 완료 |
- | 6 | Report Layer (CSV / JSON / Markdown) | ✅ 완료 |
-| 7 | CLI + 통합 테스트 | ⬜ 예정 |
+| 6 | Report Layer (CSV / JSON / Markdown) | ✅ 완료 |
+| 7 | CLI (`run`) + 통합 테스트 | ✅ 완료 |
 | 8 | Python 후처리 scripts | ⬜ 예정 |
+
+### 알려진 제약 (Known Limitations)
+
+| 항목 | 현황 |
+|------|------|
+| `sweep` 모드 | 미구현 — `run`만 제공 |
+| AMAT / delay 출력 | 미구현 — 현재 출력은 miss 개수만. `cache.yaml`의 `delay_cycles`는 시뮬레이션에 쓰이나 리포트에 노출 안 됨 |
+| 함수 간 call 전개 | Pipeline 미지원 (top-level 노드만). region inclusive/exclusive는 Attribution 단위 테스트로만 검증 |
+| 구조체 | AP 표현 미확인 — 멤버는 한 객체로 묶어 배치해야 정확 (README 메모리 모델 참조) |
+| 멀티코어 | 설정은 가능하나 통합 검증은 단일 코어 기준 |
 
 ---
 
