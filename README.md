@@ -232,8 +232,8 @@ Rank  Loop    Access       Miss%  Share  Miss Type   Hint
 | `sweep` 모드 | 미구현 — `run`만 제공 |
 | AMAT / delay 출력 | 미구현 — 현재 출력은 miss 개수만. `cache.yaml`의 `delay_cycles`는 시뮬레이션에 쓰이나 리포트에 노출 안 됨 |
 | 함수 간 call 전개 | Pipeline 미지원 (top-level 노드만). region inclusive/exclusive는 Attribution 단위 테스트로만 검증 |
-| 구조체 | AP 표현 미확인 — 멤버는 한 객체로 묶어 배치해야 정확 (README 메모리 모델 참조) |
 | 멀티코어 | 설정은 가능하나 통합 검증은 단일 코어 기준 |
+| **AP 입력 v2 전환** | **진행 중.** APE가 access_path 기반 v2(`*_g_ape.json`)를 출력하나 현재 ApLoader는 구 형식만 파싱 → `run examples/*.json`은 아직 실패. v2 전용 마이그레이션 작업 중 (구조체 `metadata.structs` 포함) |
 
 ---
 
@@ -251,6 +251,8 @@ APEX-Cache/
     report/                    ← CsvWriter, JsonWriter, MarkdownWriter
   src/                         ← 각 Layer 구현
   tests/                       ← GTest 단위 테스트
+  examples/                    ← APE LAT v2 입력 샘플 (*_g_ape.json)
+  settings/                    ← cache.yaml 등 실행 설정
   scripts/                     ← Python 후처리 (Phase 8)
   results/                     ← 출력 디렉터리 (gitignore)
 ```
