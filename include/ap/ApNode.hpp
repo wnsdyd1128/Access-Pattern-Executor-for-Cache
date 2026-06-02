@@ -26,6 +26,24 @@ struct ApNode
 };
 
 /**
+ * @brief access_path의 한 스텝(미평가 형태) — LAT v2.
+ *
+ * index_expr는 affine 식 문자열("i","i-1","5")이며 EventBuilder가
+ * 루프 문맥으로 평가한다. field는 구조체 필드 인덱스를 보관한다.
+ */
+struct RawAccessStep
+{
+  enum class Kind
+  {
+    Index,
+    Field
+  };
+  Kind kind;
+  std::string index_expr;   ///< Kind::Index일 때 affine 식 문자열
+  int64_t field_index = 0;  ///< Kind::Field일 때 구조체 필드 인덱스
+};
+
+/**
  * @brief 스칼라 변수 접근 노드.
  *
  * @pre op은 "load" 또는 "store"
@@ -34,6 +52,8 @@ struct ScalarNode : ApNode
 {
   std::string name;
   std::string op;
+
+  std::string object;  ///< LAT v2: metadata.objects의 object id
 
   ApNodeKind kind() const override { return ApNodeKind::Scalar; }
 };
@@ -54,6 +74,9 @@ struct ArrayNode : ApNode
   int64_t elem_size = 4;
   std::string op;
 
+  std::string object;                      ///< LAT v2: metadata.objects의 object id
+  std::vector<RawAccessStep> access_path;  ///< LAT v2
+
   ApNodeKind kind() const override { return ApNodeKind::Array; }
 };
 
@@ -64,6 +87,7 @@ struct CallNode : ApNode
 {
   std::string callee;
   std::vector<std::string> args;
+  std::vector<std::string> arg_objects;  ///< LAT v2: 인자별 object id(또는 리터럴)
 
   ApNodeKind kind() const override { return ApNodeKind::Call; }
 };

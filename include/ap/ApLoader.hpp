@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "ap/ApNode.hpp"
+#include "ap/ApProgram.hpp"
 
 namespace apex
 {
@@ -40,6 +41,16 @@ public:
    */
   std::vector<std::unique_ptr<ApNode>>
   load_json_file(const std::string & path) const;
+
+  /**
+   * @brief LAT v2 JSON 문자열을 파싱해 ApProgram을 반환한다.
+   * @param json {schema_version,metadata,functions} 객체 JSON
+   * @throws std::runtime_error JSON 형식이 LAT v2가 아닐 때
+   */
+  ApProgram load_program_string(const std::string & json) const;
+
+  /** @brief LAT v2 JSON 파일을 파싱해 ApProgram을 반환한다. */
+  ApProgram load_program_file(const std::string & path) const;
 
 private:
   using ShapeMap = std::unordered_map<std::string, std::vector<int64_t>>;
