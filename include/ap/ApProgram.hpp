@@ -19,6 +19,7 @@ namespace apex
 struct ApProgram
 {
   std::map<std::string, std::vector<std::unique_ptr<ApNode>>> functions;
+  std::map<std::string, std::vector<std::string>> params;  ///< 함수명→param 이름(순서)
   std::vector<std::string> roots;  ///< yard.analyze 함수 이름
   std::map<std::string, ObjectLayout> objects;
   std::map<std::string, StructLayout> structs;

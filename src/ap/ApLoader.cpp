@@ -139,6 +139,11 @@ ApProgram ApLoader::load_program_string(const std::string & src) const
     for (const auto & node : fn.at("body")) body.push_back(parse_node_v2(node));
     prog.functions[name] = std::move(body);
 
+    std::vector<std::string> params;
+    for (const auto & p : fn.value("params", json::array()))
+      params.push_back(p.get<std::string>());
+    prog.params[name] = std::move(params);
+
     if (fn.contains("annotations"))
       for (const auto & a : fn["annotations"])
         if (a.get<std::string>() == "yard.analyze")

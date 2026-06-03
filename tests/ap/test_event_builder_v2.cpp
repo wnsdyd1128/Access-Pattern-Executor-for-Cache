@@ -66,6 +66,45 @@ const char* kScalarCall = R"({
   ]
 })";
 
+// touch(yard.inline)가 포인터 param x[idx]를 load/store. call_kernel(yard.analyze)이
+// for i 루프에서 touch(a, i)를 Call → param x↔global::a, idx↔루프변수 i 바인딩.
+const char* kCall = R"({
+  "schema_version":2,
+  "metadata":{"objects":{
+    "function:touch::param:x":{"kind":"pointer","elem_type":"float","elem_size":4},
+    "function:touch::param:idx":{"kind":"scalar","elem_type":"i32","elem_size":4},
+    "global::a":{"kind":"array","shape":[16],"elem_type":"float","elem_size":4}
+  },"structs":{}},
+  "functions":[
+    {"function":"touch","params":["x","idx"],"annotations":["yard.inline"],"body":[
+      {"type":"Array","object":"function:touch::param:x","op":"load","access_path":[{"kind":"index","value":"idx"}]},
+      {"type":"Array","object":"function:touch::param:x","op":"store","access_path":[{"kind":"index","value":"idx"}]}
+    ]},
+    {"function":"call_kernel","params":[],"annotations":["yard.analyze"],"body":[
+      {"type":"Loop","var":"i","start":0,"bound":16,"depth":1,"body":[
+        {"type":"Call","callee":"touch","args":["a","i"],"arg_objects":["global::a","i"]}
+      ]}
+    ]}
+  ]
+})";
+
+// 리터럴 인자: kernel(a, 5)를 루프 없이 1회 Call → idx param이 상수 5로 평가.
+const char* kCallLiteral = R"({
+  "schema_version":2,
+  "metadata":{"objects":{
+    "function:touch::param:x":{"kind":"pointer","elem_type":"float","elem_size":4},
+    "global::a":{"kind":"array","shape":[16],"elem_type":"float","elem_size":4}
+  },"structs":{}},
+  "functions":[
+    {"function":"touch","params":["x","idx"],"annotations":["yard.inline"],"body":[
+      {"type":"Array","object":"function:touch::param:x","op":"load","access_path":[{"kind":"index","value":"idx"}]}
+    ]},
+    {"function":"call_kernel","params":[],"annotations":["yard.analyze"],"body":[
+      {"type":"Call","callee":"touch","args":["a","5"],"arg_objects":["global::a","5"]}
+    ]}
+  ]
+})";
+
 std::vector<AccessEvent> events(const char* json)
 {
   ApProgram p = ApLoader{}.load_program_string(json);
@@ -127,4 +166,36 @@ TEST(EventBuilderV2, call_is_inlined_with_region_path)
   auto ev = events(kScalarCall);
   ASSERT_FALSE(ev.empty());
   EXPECT_NE(ev[0].region_path.find("helper"), std::string::npos);
+}
+
+TEST(EventBuilderV2, call_binds_object_to_caller_argument)
+{
+  // touch(a,i)의 x[idx] 접근 → param 객체가 아닌 호출자 인자 global::a로 귀속.
+  auto ev = events(kCall);
+  ASSERT_FALSE(ev.empty());
+  EXPECT_EQ(ev[0].object_name, "global::a");
+}
+
+TEST(EventBuilderV2, call_binds_index_var_to_caller_loop_value)
+{
+  // for i: touch(a,i) → callee의 idx가 호출자 루프변수 i 값으로 평가(크래시 없음).
+  // i=3의 load 이벤트(call당 load/store 2개 → index 6) → 3*4 = 12.
+  auto ev = events(kCall);
+  ASSERT_EQ(ev.size(), 32u);  // 16 iter * (load+store)
+  EXPECT_EQ(ev[6].byte_offset, 12);
+}
+
+TEST(EventBuilderV2, call_with_literal_arg_binds_constant)
+{
+  // kernel(a,5) → idx param이 상수 5로 평가 → 5*4 = 20.
+  auto ev = events(kCallLiteral);
+  ASSERT_EQ(ev.size(), 1u);
+  EXPECT_EQ(ev[0].byte_offset, 20);
+}
+
+TEST(EventBuilderV2, call_expansion_leaves_no_param_object)
+{
+  // 전개된 모든 이벤트는 실 객체로 귀속되어야 한다(param 객체 잔존 금지).
+  for (const auto & e : events(kCall))
+    EXPECT_EQ(e.object_name.rfind("function:touch::param:", 0), std::string::npos);
 }
