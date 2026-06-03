@@ -91,3 +91,149 @@ memory:
   EXPECT_THROW(YamlConfigParser::parse("/tmp/apex_test_bad.yaml"),
                std::runtime_error);
 }
+
+TEST(YamlConfigParser, parses_size_bytes_with_kib_unit)
+{
+  write_yaml("/tmp/apex_test_size_kib.yaml", R"(
+caches:
+  - name: L1D0
+    role: L1
+    size_bytes: 32 KiB
+memory:
+  delay_cycles: 120
+)");
+  auto cfg = YamlConfigParser::parse("/tmp/apex_test_size_kib.yaml");
+  ASSERT_EQ(cfg.caches.size(), 1u);
+  EXPECT_EQ(cfg.caches[0].size_bytes, 32768u);
+}
+
+TEST(YamlConfigParser, parses_size_bytes_with_decimal_kb_unit)
+{
+  write_yaml("/tmp/apex_test_size_kb.yaml", R"(
+caches:
+  - name: L1D0
+    role: L1
+    size_bytes: 32 KB
+memory:
+  delay_cycles: 120
+)");
+  auto cfg = YamlConfigParser::parse("/tmp/apex_test_size_kb.yaml");
+  ASSERT_EQ(cfg.caches.size(), 1u);
+  EXPECT_EQ(cfg.caches[0].size_bytes, 32000u);
+}
+
+TEST(YamlConfigParser, parses_line_size_with_byte_unit)
+{
+  write_yaml("/tmp/apex_test_line_b.yaml", R"(
+caches:
+  - name: L1D0
+    role: L1
+    size_bytes: 32 KiB
+    line_size: 32 B
+memory:
+  delay_cycles: 120
+)");
+  auto cfg = YamlConfigParser::parse("/tmp/apex_test_line_b.yaml");
+  ASSERT_EQ(cfg.caches.size(), 1u);
+  EXPECT_EQ(cfg.caches[0].line_size, 32);
+}
+
+TEST(YamlConfigParser, integer_byte_values_remain_supported)
+{
+  write_yaml("/tmp/apex_test_integer_bytes.yaml", R"(
+caches:
+  - name: L1D0
+    role: L1
+    size_bytes: 32768
+    line_size: 32
+memory:
+  delay_cycles: 120
+)");
+  auto cfg = YamlConfigParser::parse("/tmp/apex_test_integer_bytes.yaml");
+  ASSERT_EQ(cfg.caches.size(), 1u);
+  EXPECT_EQ(cfg.caches[0].size_bytes, 32768u);
+  EXPECT_EQ(cfg.caches[0].line_size, 32);
+}
+
+TEST(YamlConfigParser, like_base_accepts_unit_string)
+{
+  write_yaml("/tmp/apex_test_like_base_units.yaml", R"(
+caches:
+  - name: L1D0
+    role: L1
+    size_bytes: 32 KiB
+    line_size: 32 B
+  - name: L1D1
+    like: L1D0
+    private_to: 1
+memory:
+  delay_cycles: 120
+)");
+  auto cfg = YamlConfigParser::parse("/tmp/apex_test_like_base_units.yaml");
+  ASSERT_EQ(cfg.caches.size(), 2u);
+  EXPECT_EQ(cfg.caches[1].size_bytes, 32768u);
+  EXPECT_EQ(cfg.caches[1].line_size, 32);
+}
+
+TEST(YamlConfigParser, like_override_accepts_unit_string)
+{
+  write_yaml("/tmp/apex_test_like_override_units.yaml", R"(
+caches:
+  - name: L1D0
+    role: L1
+    size_bytes: 64 KiB
+    line_size: 64 B
+  - name: L1D1
+    like: L1D0
+    size_bytes: 32 KiB
+    line_size: 32 B
+memory:
+  delay_cycles: 120
+)");
+  auto cfg = YamlConfigParser::parse("/tmp/apex_test_like_override_units.yaml");
+  ASSERT_EQ(cfg.caches.size(), 2u);
+  EXPECT_EQ(cfg.caches[1].size_bytes, 32768u);
+  EXPECT_EQ(cfg.caches[1].line_size, 32);
+}
+
+TEST(YamlConfigParser, rejects_unknown_size_unit)
+{
+  write_yaml("/tmp/apex_test_unknown_unit.yaml", R"(
+caches:
+  - name: L1D0
+    role: L1
+    size_bytes: 32 XB
+memory:
+  delay_cycles: 120
+)");
+  EXPECT_THROW(YamlConfigParser::parse("/tmp/apex_test_unknown_unit.yaml"),
+               std::runtime_error);
+}
+
+TEST(YamlConfigParser, rejects_ambiguous_size_unit)
+{
+  write_yaml("/tmp/apex_test_ambiguous_unit.yaml", R"(
+caches:
+  - name: L1D0
+    role: L1
+    size_bytes: 32 K
+memory:
+  delay_cycles: 120
+)");
+  EXPECT_THROW(YamlConfigParser::parse("/tmp/apex_test_ambiguous_unit.yaml"),
+               std::runtime_error);
+}
+
+TEST(YamlConfigParser, rejects_non_positive_size)
+{
+  write_yaml("/tmp/apex_test_zero_size.yaml", R"(
+caches:
+  - name: L1D0
+    role: L1
+    size_bytes: 0 B
+memory:
+  delay_cycles: 120
+)");
+  EXPECT_THROW(YamlConfigParser::parse("/tmp/apex_test_zero_size.yaml"),
+               std::runtime_error);
+}

@@ -8,9 +8,9 @@ caches:
   - name: L1D0
     role: L1
     private_to: 0
-    size_bytes: 32768
-    line_size: 32
-    associativity: 8
+    size_bytes: 32 KiB
+    line_size: 32 B
+    associativity: 4
     replacement: LRU
     write_policy: write-back
     write_allocate: true
@@ -18,7 +18,7 @@ caches:
     next: L2
   - name: L2
     role: LLC
-    size_bytes: 262144
+    size_bytes: 2 MiB
     line_size: 32
     associativity: 8
     replacement: LRU
