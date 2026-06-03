@@ -9,7 +9,7 @@ caches:
     role: L1
     private_to: 0
     size_bytes: 32768
-    line_size: 64
+    line_size: 32
     associativity: 8
     replacement: LRU
     write_policy: write-back
@@ -19,7 +19,7 @@ caches:
   - name: L2
     role: LLC
     size_bytes: 262144
-    line_size: 64
+    line_size: 32
     associativity: 8
     replacement: LRU
     write_policy: write-back
