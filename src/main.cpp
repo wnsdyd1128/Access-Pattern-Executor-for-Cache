@@ -1,5 +1,6 @@
 #include <fstream>
 #include <iostream>
+#include <filesystem>
 #include <string>
 
 #include "analysis/Diagnostics.hpp"
@@ -27,6 +28,19 @@ std::string find_opt(int argc, char * argv[], const std::string & flag)
   return {};
 }
 
+std::string output_basename(const std::string & input)
+{
+  std::string base = std::filesystem::path(input).stem().string();
+  const std::string suffix = "_g_ape";
+  if (base.size() >= suffix.size() &&
+      base.compare(base.size() - suffix.size(), suffix.size(), suffix) == 0)
+  {
+    base.erase(base.size() - suffix.size());
+    base += "_ape";
+  }
+  return base;
+}
+
 int run_command(int argc, char * argv[])
 {
   // argv[2] = input.ap.json
@@ -49,23 +63,35 @@ int run_command(int argc, char * argv[])
 
   try
   {
+    std::filesystem::create_directories(output);
+
     apex::ApProgram program = apex::ApLoader{}.load_program_file(input);
 
     HierarchyConfig config = YamlConfigParser::parse(cache_yaml);
     apex::Pipeline pipeline(config);
     apex::PipelineResult result = pipeline.run(program);
 
-    std::ofstream summary_csv(output + "/summary.csv");
-    apex::CsvWriter::write_summary(summary_csv, result.stats);
+    const std::filesystem::path output_dir(output);
+    const std::string base = output_basename(input);
 
-    std::ofstream object_csv(output + "/object_breakdown.csv");
-    apex::CsvWriter::write_object_breakdown(object_csv, result.attribution);
+    std::ofstream summary_csv(output_dir / (base + ".csv"));
+    if (!summary_csv) throw std::runtime_error("cannot write summary.csv");
+    apex::CsvWriter::write_summary(summary_csv, result.stats,
+                                   result.cache_stats);
 
-    std::ofstream summary_json(output + "/summary.json");
-    apex::JsonWriter::write_summary(summary_json, result.stats);
+    std::ofstream object_csv(output_dir / (base + "_objects.csv"));
+    if (!object_csv)
+      throw std::runtime_error("cannot write object_breakdown.csv");
+    apex::CsvWriter::write_object_breakdown(object_csv, result.cache_stats);
+
+    std::ofstream summary_json(output_dir / (base + ".json"));
+    if (!summary_json) throw std::runtime_error("cannot write summary.json");
+    apex::JsonWriter::write_summary(summary_json, result.stats,
+                                    result.cache_stats);
 
     auto hints = apex::Diagnostics{}.generate(result.stats);
-    std::ofstream diag_md(output + "/diagnostics.md");
+    std::ofstream diag_md(output_dir / (base + "_diagnostics.md"));
+    if (!diag_md) throw std::runtime_error("cannot write diagnostics.md");
     apex::MarkdownWriter::write_diagnostics(diag_md, hints);
 
     std::cerr << "wrote results to " << output << "/\n";
