@@ -82,6 +82,57 @@ const char* kLocal2d = R"({
     ]}
   ]}]
 })";
+
+// stride = line_size: A[i][0], shape[32,8] elem4 → byte 32*i = 라인 i. 매 접근 새 라인.
+const char* kStride = R"({
+  "schema_version":2,
+  "metadata":{"objects":{"global::A":{"kind":"array","shape":[32,8],"elem_type":"i32","elem_size":4}},"structs":{}},
+  "functions":[{"function":"f","params":[],"annotations":["yard.analyze"],"body":[
+    {"type":"Loop","var":"i","start":0,"bound":32,"depth":1,"body":[
+      {"type":"Array","object":"global::A","access_path":[{"kind":"index","value":"i"},{"kind":"index","value":"0"}],"op":"load"}
+    ]}
+  ]}]
+})";
+
+// direct-mapped(assoc=1, line32, 128B=4 set). A[0]=line0(set0), B[0]=line4(set0).
+// A는 128B라 base0(line0..3), B는 base128(line4). 같은 set 교번 → conflict.
+const char* kConflict = R"({
+  "schema_version":2,
+  "metadata":{"objects":{
+    "global::A":{"kind":"array","shape":[32],"elem_type":"i32","elem_size":4},
+    "global::B":{"kind":"array","shape":[8],"elem_type":"i32","elem_size":4}},"structs":{}},
+  "functions":[{"function":"f","params":[],"annotations":["yard.analyze"],"body":[
+    {"type":"Loop","var":"k","start":0,"bound":3,"depth":1,"body":[
+      {"type":"Array","object":"global::A","access_path":[{"kind":"index","value":"0"}],"op":"load"},
+      {"type":"Array","object":"global::B","access_path":[{"kind":"index","value":"0"}],"op":"load"}
+    ]}
+  ]}]
+})";
+
+// A[8][8] elem4, line32(=8 ints/line) → 한 행=1 라인. L1=128B(4 라인)로 배열(8 라인)보다 작음.
+const char* kRow = R"({
+  "schema_version":2,
+  "metadata":{"objects":{"global::A":{"kind":"array","shape":[8,8],"elem_type":"i32","elem_size":4}},"structs":{}},
+  "functions":[{"function":"f","params":[],"annotations":["yard.analyze"],"body":[
+    {"type":"Loop","var":"i","start":0,"bound":8,"depth":1,"body":[
+      {"type":"Loop","var":"j","start":0,"bound":8,"depth":2,"body":[
+        {"type":"Array","object":"global::A","access_path":[{"kind":"index","value":"i"},{"kind":"index","value":"j"}],"op":"load"}
+      ]}
+    ]}
+  ]}]
+})";
+
+const char* kCol = R"({
+  "schema_version":2,
+  "metadata":{"objects":{"global::A":{"kind":"array","shape":[8,8],"elem_type":"i32","elem_size":4}},"structs":{}},
+  "functions":[{"function":"f","params":[],"annotations":["yard.analyze"],"body":[
+    {"type":"Loop","var":"j","start":0,"bound":8,"depth":1,"body":[
+      {"type":"Loop","var":"i","start":0,"bound":8,"depth":2,"body":[
+        {"type":"Array","object":"global::A","access_path":[{"kind":"index","value":"i"},{"kind":"index","value":"j"}],"op":"load"}
+      ]}
+    ]}
+  ]}]
+})";
 }  // namespace
 
 TEST(PipelineV2, sequential_1d_one_miss_per_line)
@@ -109,4 +160,27 @@ TEST(PipelineV2, per_object_miss_attribution)
   auto r = run(kLocal2d, make_config(1u << 20, 64, 8));
   EXPECT_EQ(r.stats.by_object["fn::A"], 256u);
   EXPECT_EQ(r.stats.by_object["fn::B"], 256u);
+}
+
+TEST(PipelineV2, stride_equal_to_line_misses_every_access)
+{
+  auto r = run(kStride, make_config(32768, 32, 8));
+  EXPECT_EQ(r.stats.cold, 32u);            // 32회 접근 모두 새 라인
+  EXPECT_EQ(total_misses(r.stats), 32u);
+}
+
+TEST(PipelineV2, alternating_same_set_access_is_conflict_miss)
+{
+  auto r = run(kConflict, make_config(128, 32, 1));  // direct-mapped, 4 set
+  EXPECT_EQ(r.stats.cold, 2u);      // 최초 A, B
+  EXPECT_EQ(r.stats.conflict, 4u);  // 이후 A,B,A,B
+  EXPECT_EQ(r.stats.capacity, 0u);
+}
+
+TEST(PipelineV2, column_traversal_misses_more_than_row_traversal)
+{
+  auto row = run(kRow, make_config(128, 32, 4));
+  auto col = run(kCol, make_config(128, 32, 4));
+  EXPECT_EQ(total_misses(row.stats), 8u);  // 행당 1 라인
+  EXPECT_GT(total_misses(col.stats), total_misses(row.stats));
 }

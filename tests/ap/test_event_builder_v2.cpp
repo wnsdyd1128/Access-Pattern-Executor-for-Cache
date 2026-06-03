@@ -50,6 +50,22 @@ const char* kStruct = R"({
   ]}]
 })";
 
+// helper(yard.inline)의 Scalar 접근을 main(yard.analyze)이 루프 3회 Call.
+const char* kScalarCall = R"({
+  "schema_version":2,
+  "metadata":{"objects":{"global::x":{"kind":"scalar","elem_type":"i32","elem_size":4}},"structs":{}},
+  "functions":[
+    {"function":"helper","params":[],"annotations":["yard.inline"],"body":[
+      {"type":"Scalar","object":"global::x","op":"load"}
+    ]},
+    {"function":"main","params":[],"annotations":["yard.analyze"],"body":[
+      {"type":"Loop","var":"i","start":0,"bound":3,"depth":1,"body":[
+        {"type":"Call","callee":"helper","args":[],"arg_objects":[]}
+      ]}
+    ]}
+  ]
+})";
+
 std::vector<AccessEvent> events(const char* json)
 {
   ApProgram p = ApLoader{}.load_program_string(json);
@@ -94,4 +110,21 @@ TEST(EventBuilderV2, struct_access_byte_offset)
   auto ev = events(kStruct);
   ASSERT_EQ(ev.size(), 1u);
   EXPECT_EQ(ev[0].byte_offset, 48);
+}
+
+TEST(EventBuilderV2, scalar_node_produces_event_with_object)
+{
+  // main이 helper의 Scalar 접근을 3회 Call → 3 이벤트, object=global::x
+  auto ev = events(kScalarCall);
+  ASSERT_EQ(ev.size(), 3u);
+  EXPECT_EQ(ev[0].object_name, "global::x");
+  EXPECT_EQ(ev[0].op, "load");
+}
+
+TEST(EventBuilderV2, call_is_inlined_with_region_path)
+{
+  // Call 전개 시 region_path에 callee가 포함된다.
+  auto ev = events(kScalarCall);
+  ASSERT_FALSE(ev.empty());
+  EXPECT_NE(ev[0].region_path.find("helper"), std::string::npos);
 }

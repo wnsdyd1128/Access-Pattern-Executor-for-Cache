@@ -107,7 +107,24 @@ const char* kArray2dJson = R"({
   ]
 })";
 
+const char* kScalarCallJson = R"({
+  "schema_version": 2,
+  "metadata": {"objects": {"global::x": {"kind":"scalar","elem_type":"i32","elem_size":4}}, "structs": {}},
+  "functions": [
+    {"function":"helper","params":[],"annotations":["yard.inline"],"body":[
+      {"type":"Scalar","object":"global::x","op":"load"}
+    ]},
+    {"function":"main","params":[],"annotations":["yard.analyze"],"body":[
+      {"type":"Call","callee":"helper","args":["x"],"arg_objects":["global::x"]}
+    ]}
+  ]
+})";
+
 ApProgram loadArray() { return ApLoader{}.load_program_string(kArrayJson); }
+ApProgram loadScalarCall()
+{
+  return ApLoader{}.load_program_string(kScalarCallJson);
+}
 ApProgram loadArray2d() { return ApLoader{}.load_program_string(kArray2dJson); }
 ApProgram loadStruct() { return ApLoader{}.load_program_string(kStructJson); }
 }  // namespace
@@ -225,4 +242,28 @@ TEST(ApLoaderV2, struct_access_path_field_index_value)
   ASSERT_NE(a, nullptr);
   EXPECT_EQ(std::get<FieldStep>(a->access_path[0]).index, 1);  // items
   EXPECT_EQ(std::get<FieldStep>(a->access_path[2]).index, 0);  // x
+}
+
+// ── Scalar / Call 노드 ────────────────────────────────────────
+
+TEST(ApLoaderV2, scalar_node_parsed_with_object_and_op)
+{
+  ApProgram p = loadScalarCall();
+  const auto& body = p.functions.at("helper");
+  ASSERT_EQ(body.size(), 1u);
+  ASSERT_EQ(body[0]->kind(), ApNodeKind::Scalar);
+  const auto* s = static_cast<const ScalarNode*>(body[0].get());
+  EXPECT_EQ(s->object, "global::x");
+  EXPECT_EQ(s->op, "load");
+}
+
+TEST(ApLoaderV2, call_node_parsed_with_callee_and_arg_objects)
+{
+  ApProgram p = loadScalarCall();
+  const auto& body = p.functions.at("main");
+  ASSERT_EQ(body.size(), 1u);
+  ASSERT_EQ(body[0]->kind(), ApNodeKind::Call);
+  const auto* c = static_cast<const CallNode*>(body[0].get());
+  EXPECT_EQ(c->callee, "helper");
+  EXPECT_EQ(c->arg_objects, (std::vector<std::string>{"global::x"}));
 }
