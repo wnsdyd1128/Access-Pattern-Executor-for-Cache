@@ -262,7 +262,11 @@ APEX-Cache/
   tests/                       ← GTest 단위 테스트
   examples/                    ← APE LAT v2 입력 샘플 (*_g_ape.json)
   settings/                    ← cache.yaml 등 실행 설정
-  scripts/                     ← Python 후처리 (Phase 8)
+  backend/                     ← Python 후처리·시각화 (Phase 8)
+    reports.py                 ← 리포트 로딩·집계
+    plotting/                  ← style, bars, figures
+    __main__.py                ← CLI (python3 -m backend)
+    tests/                     ← pytest
   results/                     ← 출력 디렉터리 (gitignore)
 ```
 
